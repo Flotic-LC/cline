@@ -1,10 +1,11 @@
-import { afterAll, beforeEach, expect, setSystemTime, test } from "bun:test";
+import { afterAll, beforeEach, expect, spyOn, test } from "bun:test";
 import type { AgentMessage, ComposerSuggestionsState } from "@cline/shared";
 import { createNextTurnPlugin, factsOf, pool, state } from "./plugin";
 
 /** A worker's revisions count on from the clock at setup, so a worker set up at 0 serves r1, r2, … */
-beforeEach(() => setSystemTime(new Date(0)));
-afterAll(() => setSystemTime());
+const clock = spyOn(Date, "now").mockReturnValue(0);
+beforeEach(() => clock.mockReturnValue(0));
+afterAll(() => clock.mockRestore());
 
 const msg = (parts: unknown[]): AgentMessage =>
 	({
@@ -192,7 +193,9 @@ function connect(published: (ComposerSuggestionsState | null)[] = []) {
 	const plugin = createNextTurnPlugin();
 	plugin.setup?.(
 		{
-			registerUiSlot: (s: unknown) => void (slot = s as typeof slot),
+			registerUiSlot: (s: unknown) => {
+				slot = s as typeof slot;
+			},
 		} as never,
 		{
 			ui: {
@@ -468,7 +471,7 @@ test("a worker restarted after an idle reclaim withdraws the set core still hold
 	await before.afterRun(run("completed", [edited]));
 	expect(before.ids()).toEqual(["r1:verify", "r1:review_diff", "r1:wrap_up"]);
 
-	setSystemTime(new Date(30 * 60_000));
+	clock.mockReturnValue(30 * 60_000);
 	const after = connect(before.published);
 	expect(after.last()).toBeNull();
 	const verify = { revision: "r1", itemId: "r1:verify" };
